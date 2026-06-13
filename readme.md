@@ -30,6 +30,8 @@ curl -fsSL https://raw.githubusercontent.com/Kurniaharun/docker-windows/master/i
 
 Golden image (~5.5 GB) diunduh otomatis dari archive.org. **Tanpa install Windows, tanpa setup user, tanpa masuk RDP.**
 
+Log lengkap tersimpan di `/var/log/ghostspectre-install.log` (auto-fix corrupt golden, disk penuh, skip rebuild, dll.)
+
 | Setelah selesai | |
 |---|---|
 | Web | `http://IP_VPS:8006` |
