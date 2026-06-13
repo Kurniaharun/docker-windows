@@ -14,6 +14,11 @@
 
 Windows inside a Docker container.
 
+> **Fork mod by [kurniaharun](https://github.com/kurniaharun)** — based on [dockur/windows](https://github.com/dockur/windows)
+>
+> - Auto-download **Ghost Spectre** Win10/Win11 from archive.org (`VERSION: gs10` / `gs11`)
+> - Default user **`KurrXd`** / password **`admin`** for all Windows editions
+
 ## Features ✨
 
  - ISO downloader

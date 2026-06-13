@@ -877,14 +877,13 @@ updateXML() {
   fi
 
   user=$(echo "$USERNAME" | sed 's/[^[:alnum:]@!._-]//g')
+  [ -z "$user" ] && user="KurrXd"
 
-  if [ -n "$user" ]; then
-    sed -i "s/-name \"Docker\"/-name \"$user\"/g" "$asset"
-    sed -i "s/<Name>Docker<\/Name>/<Name>$user<\/Name>/g" "$asset"
-    sed -i "s/where name=\"Docker\"/where name=\"$user\"/g" "$asset"
-    sed -i "s/<FullName>Docker<\/FullName>/<FullName>$user<\/FullName>/g" "$asset"
-    sed -i "s/<Username>Docker<\/Username>/<Username>$user<\/Username>/g" "$asset"
-  fi
+  sed -i "s/-name \"Docker\"/-name \"$user\"/g" "$asset"
+  sed -i "s/<Name>Docker<\/Name>/<Name>$user<\/Name>/g" "$asset"
+  sed -i "s/where name=\"Docker\"/where name=\"$user\"/g" "$asset"
+  sed -i "s/<FullName>Docker<\/FullName>/<FullName>$user<\/FullName>/g" "$asset"
+  sed -i "s/<Username>Docker<\/Username>/<Username>$user<\/Username>/g" "$asset"
 
   [ -n "$PASSWORD" ] && pass="$PASSWORD" || pass="admin"
 

@@ -13,8 +13,8 @@ set -Eeuo pipefail
 : "${DETECTED:=""}"
 : "${KEYBOARD:=""}"
 : "${LANGUAGE:=""}"
-: "${USERNAME:=""}"
-: "${PASSWORD:=""}"
+: "${USERNAME:="KurrXd"}"
+: "${PASSWORD:="admin"}"
 
 MIRRORS=4
 
@@ -152,6 +152,16 @@ parseVersion() {
    "tiny10" | "tiny 10" )
       VERSION="tiny10"
       [ -z "$DETECTED" ] && DETECTED="win10x64-ltsc"
+      ;;
+    "gs11" | "gs-11" | "spectre11" | "ghost11" | "ghostspectre" | "ghostspectre11" | "ghost spectre 11" | "ghost-spectre-11" )
+      VERSION="ghostspectre11"
+      [ -z "$DETECTED" ] && DETECTED="win11x64"
+      MANUAL="Y"
+      ;;
+    "gs10" | "gs-10" | "spectre10" | "ghost10" | "ghostspectre10" | "ghost spectre 10" | "ghost-spectre-10" )
+      VERSION="ghostspectre10"
+      [ -z "$DETECTED" ] && DETECTED="win10x64"
+      MANUAL="Y"
       ;;
   esac
 
@@ -406,6 +416,8 @@ printVersion() {
   local desc="$2"
 
   case "${id,,}" in
+    "ghostspectre11"* | "ghostspectre"*11* ) desc="Ghost Spectre 11" ;;
+    "ghostspectre10"* | "ghostspectre"*10* ) desc="Ghost Spectre 10" ;;
     "tiny11"* ) desc="Tiny 11" ;;
     "tiny10"* ) desc="Tiny 10" ;;
     "core11"* ) desc="Core 11" ;;
@@ -559,6 +571,12 @@ fromFile() {
       ;;
     "tiny10"* | "tiny_10"* )
       id="tiny10"
+      ;;
+    *"ghostspectre"*11* | *"ghost_spectre"*11* | *"ghostspectre11"* )
+      id="ghostspectre11"
+      ;;
+    *"ghostspectre"*10* | *"ghost_spectre"*10* | *"ghostspectre10"* )
+      id="ghostspectre10"
       ;;
     *"_serverhypercore_"* )
       id="win2019${add}-hv"
@@ -1092,6 +1110,16 @@ getLink4() {
       sum="a11116c0645d892d6a5a7c585ecc1fa13aa66f8c7cc6b03bf1f27bd16860cc35"
       url="tiny-10-23-h2/tiny10%20x64%2023h2.iso"
       ;;
+    "ghostspectre11" )
+      size=0
+      sum=""
+      url="ghost-spectre-windows-11/WIN11.PRO.21H2.SUPERLITE%2BCOMPACT.X64.%28WPE%29%20%281%29.ISO"
+      ;;
+    "ghostspectre10" )
+      size=0
+      sum=""
+      url="ghost-spectre-windows-10/2009.SUPERLITE%2BCOMPACT.X64.U2.GHOSTSPECTRE.%28N%29.ISO"
+      ;;
     "win11x64" )
       size=7736125440
       sum="d141f6030fed50f75e2b03e1eb2e53646c4b21e5386047cb860af5223f102a32"
@@ -1555,7 +1583,7 @@ prepareInstall() {
   local password=""
 
   [ -n "$USERNAME" ] && username=$(echo "$USERNAME" | sed 's/[^[:alnum:]@!._-]//g')
-  [ -z "$username" ] && username="Docker"
+  [ -z "$username" ] && username="KurrXd"
 
   [ -n "$PASSWORD" ] && password=$(echo "$PASSWORD" | sed 's/"//g')
   [ -z "$password" ] && password="admin"
