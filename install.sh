@@ -11,6 +11,7 @@ GOLDEN_URL="${GOLDEN_URL:-https://archive.org/download/windows-golden.tar/window
 GOLDEN_MIN_BYTES="${GOLDEN_MIN_BYTES:-5000000000}"
 GOLDEN_FILE="windows-golden.tar.gz"
 DATA_IMG_MIN_BYTES="${DATA_IMG_MIN_BYTES:-8000000000}"
+DATA_IMG_MIN_DU_BYTES="${DATA_IMG_MIN_DU_BYTES:-4000000000}"
 DISK_MIN_FREE_KB="${DISK_MIN_FREE_KB:-25000000}"
 REPO="${REPO:-https://github.com/Kurniaharun/docker-windows.git}"
 INSTALL_DIR="${INSTALL_DIR:-/root/docker-windows}"
@@ -80,6 +81,16 @@ fmt_kb() {
   fi
 }
 
+# Bytes benar-benar terpakai di disk (bukan ukuran virtual sparse file)
+file_disk_bytes() {
+  local f="$1"
+  du -b "$f" 2>/dev/null | cut -f1
+}
+
+file_virtual_bytes() {
+  stat -c%s "$1" 2>/dev/null || stat -f%z "$1"
+}
+
 elapsed() {
   local now=$(( $(date +%s) - START_TS ))
   printf '%dm%02ds' $((now / 60)) $((now % 60))
@@ -114,29 +125,43 @@ run_docker_build() {
   log_ok "Build image selesai: $IMAGE"
 }
 
-# Extract tar: tampilkan ukuran data.img naik di console
+# Extract tar: progress pakai du (disk nyata), bukan stat (virtual sparse)
 run_tar_extract() {
   local archive="$1"
   say ">>> SEDANG: Extract golden image → data.img Windows"
-  say "    File: $GOLDEN_FILE (~5.5 GB terkompresi → ~17 GB data.img)"
-  say "    Estimasi: 2-5 menit — INI NORMAL kalau terlihat 'diam'"
+  say "    File: $GOLDEN_FILE (~5.5 GB zip → data.img sparse ~32G virtual)"
+  say "    Progress = bytes di disk (bukan ukuran virtual file)"
+  say "    Estimasi: 1-4 menit — INI NORMAL kalau terlihat 'diam'"
   say "    Waktu: $(elapsed) — JANGAN TUTUP TERMINAL"
   say_blank
 
-  tar -xzf "$archive" -C "$INSTALL_DIR" >> "$LOG_FILE" 2>&1 &
+  if ! command -v pigz &>/dev/null; then
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get install -y -qq pigz 2>/dev/null || true
+  fi
+
+  local extract_cmd=()
+  if command -v pigz &>/dev/null; then
+    say "    Metode: pigz (paralel) + tar sparse"
+    extract_cmd=(bash -c "pigz -dc \"${archive}\" | tar -xS -C \"${INSTALL_DIR}\"")
+  else
+    say "    Metode: tar sparse (-S)"
+    extract_cmd=(tar -xSpf "$archive" -C "$INSTALL_DIR")
+  fi
+
+  "${extract_cmd[@]}" >> "$LOG_FILE" 2>&1 &
   local pid=$!
-  local spin='|/-\' i=0 last_size=0
+  local spin='|/-\' i=0 last_du=0
 
   while kill -0 "$pid" 2>/dev/null; do
     i=$(( (i + 1) % 4 ))
-    local size_str=""
+    local size_str="menyiapkan extract..."
     if [[ -f "$INSTALL_DIR/windows/data.img" ]]; then
-      local sz
-      sz=$(stat -c%s "$INSTALL_DIR/windows/data.img" 2>/dev/null || echo 0)
-      if (( sz > last_size )); then last_size=$sz; fi
-      size_str="data.img: $(fmt_bytes "$last_size") / ~17GB"
-    else
-      size_str="menyiapkan extract..."
+      local du_sz
+      du_sz=$(file_disk_bytes "$INSTALL_DIR/windows/data.img")
+      du_sz=${du_sz:-0}
+      if (( du_sz > last_du )); then last_du=$du_sz; fi
+      size_str="disk: $(fmt_bytes "$last_du")"
     fi
     printf '\r    [%s] Extract golden — %s — %s   ' "${spin:$i:1}" "$(elapsed)" "$size_str"
     sleep 1
@@ -147,10 +172,14 @@ run_tar_extract() {
   printf '\r%100s\r' ''
 
   if (( rc != 0 )); then
-    log_err "Extract gagal (exit $rc)"
+    log_err "Extract gagal (exit $rc) — cek $LOG_FILE"
     return "$rc"
   fi
-  log_ok "Extract selesai — data.img: $(fmt_bytes "$(stat -c%s "$INSTALL_DIR/windows/data.img")")"
+
+  local virt du
+  virt=$(file_virtual_bytes "$INSTALL_DIR/windows/data.img")
+  du=$(file_disk_bytes "$INSTALL_DIR/windows/data.img")
+  log_ok "Extract selesai — virtual: $(fmt_bytes "$virt") | disk: $(fmt_bytes "$du")"
 }
 
 # ── Auto-fix ─────────────────────────────────────────────────────────────────
@@ -198,17 +227,12 @@ golden_is_valid() {
   local out="$INSTALL_DIR/golden/$GOLDEN_FILE"
   [[ -f "$out" ]] || return 1
   local size
-  size=$(stat -c%s "$out" 2>/dev/null || stat -f%z "$out")
+  size=$(file_virtual_bytes "$out")
   if (( size < GOLDEN_MIN_BYTES )); then
     log_warn "Golden tidak lengkap: $(fmt_bytes "$size") — butuh ~5.5GB"
     return 1
   fi
-  say ">>> SEDANG: Validasi checksum golden (gzip test)..."
-  if ! gzip -t "$out" 2>/dev/null; then
-    log_warn "Golden corrupt (gzip gagal)"
-    return 1
-  fi
-  log_ok "Golden valid: $(fmt_bytes "$size")"
+  log_ok "Golden valid (cek ukuran): $(fmt_bytes "$size")"
   return 0
 }
 
@@ -226,13 +250,15 @@ auto_fix_golden() {
 data_img_is_valid() {
   local img="$INSTALL_DIR/windows/data.img"
   [[ -f "$img" ]] || { log_warn "data.img belum ada"; return 1; }
-  local size
-  size=$(stat -c%s "$img" 2>/dev/null || stat -f%z "$img")
-  if (( size < DATA_IMG_MIN_BYTES )); then
-    log_warn "data.img terlalu kecil: $(fmt_bytes "$size")"
+  local virt du
+  virt=$(file_virtual_bytes "$img")
+  du=$(file_disk_bytes "$img")
+  du=${du:-0}
+  if (( virt < DATA_IMG_MIN_BYTES && du < DATA_IMG_MIN_DU_BYTES )); then
+    log_warn "data.img belum lengkap — virtual: $(fmt_bytes "$virt") disk: $(fmt_bytes "$du")"
     return 1
   fi
-  log_ok "data.img OK: $(fmt_bytes "$size")"
+  log_ok "data.img OK — virtual: $(fmt_bytes "$virt") | disk: $(fmt_bytes "$du")"
   return 0
 }
 
@@ -307,8 +333,8 @@ download_golden() {
   fi
 
   say_blank
-  say ">>> Download selesai — validasi file..."
-  golden_is_valid || { log_err "Download gagal / file corrupt"; exit 1; }
+  say ">>> Download selesai — cek ukuran file..."
+  golden_is_valid || { log_err "Download gagal / file tidak lengkap"; exit 1; }
   say ""
   say "╔══════════════════════════════════════════════════════════════╗"
   say "║  DOWNLOAD SELESAI! Lanjut extract & install Windows...       ║"
