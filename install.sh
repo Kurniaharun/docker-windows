@@ -42,13 +42,34 @@ chmod +x scripts/*.sh 2>/dev/null || true
 echo "[4/7] Build Docker image..."
 docker build -t dockurr/windows:ghostspectre .
 
+download_golden() {
+  local out="golden/windows-golden.tar.gz"
+  if [[ -f "$out" ]] && tar -tzf "$out" &>/dev/null; then
+    echo "  Golden sudah ada & valid, skip download."
+    return 0
+  fi
+
+  # aria2 multi-connection jauh lebih cepat dari archive.org vs wget single-thread
+  if ! command -v aria2c &>/dev/null; then
+    echo "  Install aria2 (download paralel)..."
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -qq && apt-get install -y -qq aria2
+  fi
+
+  if command -v aria2c &>/dev/null; then
+    echo "  Download via aria2 (16 koneksi, resume OK)..."
+    aria2c -x 16 -s 16 -k 1M -c --file-allocation=none \
+      -d golden -o windows-golden.tar.gz "$GOLDEN_URL"
+  else
+    echo "  Download via wget (fallback)..."
+    wget -c -O "$out" "$GOLDEN_URL"
+  fi
+}
+
 echo "[5/7] Download golden image (~5.5 GB)..."
+echo "  Tip: upload ke host cepat lalu GOLDEN_URL=... bash install.sh"
 mkdir -p golden
-if [[ ! -f golden/windows-golden.tar.gz ]]; then
-  wget -c -O golden/windows-golden.tar.gz "$GOLDEN_URL"
-else
-  echo "  Golden sudah ada, skip download."
-fi
+download_golden
 
 echo "[6/7] Restore golden image..."
 docker compose -f "$COMPOSE" down 2>/dev/null || true
