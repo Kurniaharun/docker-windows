@@ -91,7 +91,7 @@ step() {
 _rt_last_log=0
 progress_line() {
   local msg="$1"
-  printf '\r%b' "    ${CM}${C1}▸${C0} ${msg}   "
+  printf '\r%b' "    ${CB}>${C0} ${msg}   "
   local now
   now=$(date +%s)
   if (( now - _rt_last_log >= 15 )); then
@@ -101,19 +101,6 @@ progress_line() {
 }
 
 progress_clear() { printf '\r%100s\r' ''; }
-
-progress_bar() {
-  local cur=$1 max=$2 label=$3
-  local w=28 pct filled empty bar=""
-  [[ "$max" -lt 1 ]] && max=1
-  pct=$(( cur * 100 / max ))
-  (( pct > 100 )) && pct=100
-  filled=$(( pct * w / 100 ))
-  empty=$(( w - filled ))
-  bar=$(printf "%${filled}s" | tr ' ' '█')
-  bar+=$(printf "%${empty}s" | tr ' ' '░')
-  progress_line "${label} [${bar}] ${pct}%"
-}
 
 # aria2: tampilkan baris progress [#...] saja, format rapi
 stream_aria2() {
@@ -247,7 +234,7 @@ run_tar_extract() {
   local archive="$1"
   log_step "Extract golden → data.img"
   log_sub "Archive: ${GOLDEN_FILE}  ·  sparse ~32G virtual"
-  log_sub "Progress = disk nyata  ·  estimasi 1-4 menit"
+  log_sub "Progress: ukuran disk naik (bukan %)  ·  estimasi 1-4 menit"
   hr
 
   if ! command -v pigz &>/dev/null; then
@@ -265,17 +252,19 @@ run_tar_extract() {
   fi
 
   "${extract_cmd[@]}" >> "$LOG_FILE" 2>&1 &
-  local pid=$! last_du=0 target_du=12000000000
+  local pid=$! last_du=0 spin_i=0
+  local spin='|/-\'
 
   while kill -0 "$pid" 2>/dev/null; do
+    spin_i=$(( (spin_i + 1) % 4 ))
     if [[ -f "$INSTALL_DIR/windows/data.img" ]]; then
       local du_sz
       du_sz=$(file_disk_bytes "$INSTALL_DIR/windows/data.img")
       du_sz=${du_sz:-0}
       (( du_sz > last_du )) && last_du=$du_sz
-      progress_bar "$last_du" "$target_du" "Extract"
+      progress_line "[${spin:$spin_i:1}] Extract  $(fmt_bytes "$last_du") ditulis  ·  $(elapsed)"
     else
-      progress_line "Extract  menyiapkan...  $(elapsed)"
+      progress_line "[${spin:$spin_i:1}] Extract  unpack...  ·  $(elapsed)"
     fi
     sleep 1
   done
