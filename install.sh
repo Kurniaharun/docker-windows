@@ -1,6 +1,9 @@
 #!/bin/bash
 # Fast setup — VPS kosong → Windows Ghost Spectre golden (zero manual setup)
-# Usage: curl -fsSL https://raw.githubusercontent.com/Kurniaharun/docker-windows/master/install.sh | bash
+# Usage (recommended):
+#   curl -fsSL https://raw.githubusercontent.com/Kurniaharun/docker-windows/master/get.sh | bash
+# Atau:
+#   git clone --depth 1 https://github.com/Kurniaharun/docker-windows.git /root/docker-windows && bash /root/docker-windows/install.sh
 
 set -euo pipefail
 

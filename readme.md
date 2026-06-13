@@ -25,7 +25,12 @@ Windows inside a Docker container.
 ## Fast Setup — 1 Command (VPS kosong → Windows siap pakai)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Kurniaharun/docker-windows/master/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Kurniaharun/docker-windows/master/get.sh | bash
+```
+
+Alternatif (langsung dari git, tanpa CDN):
+```bash
+git clone --depth 1 https://github.com/Kurniaharun/docker-windows.git /root/docker-windows && bash /root/docker-windows/install.sh
 ```
 
 Golden image (~5.5 GB) diunduh otomatis dari archive.org. **Tanpa install Windows, tanpa setup user, tanpa masuk RDP.**
