@@ -19,6 +19,8 @@ Windows inside a Docker container.
 > - Auto-download **Ghost Spectre** Win10/Win11 from archive.org (`VERSION: gs10` / `gs11`)
 > - Default user **`KurrXd`** / password **`admin`** for official Windows (10/11/LTSC, dll.)
 > - **Ghost Spectre** pakai install manual — set **`Administrator`** / **`12345678`** saat setup installer
+> - Bat **Enable-RDP**, **Open-Shared**, **RDP-Connect-Help** otomatis di **Desktop** setelah login pertama
+> - Panduan lengkap: **[SETUP-FULL.md](SETUP-FULL.md)**
 
 ## Features ✨
 

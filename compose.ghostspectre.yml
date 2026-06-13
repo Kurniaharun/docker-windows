@@ -5,8 +5,8 @@ services:
     container_name: windows
     environment:
       VERSION: "gs11"
-      # Ghost Spectre = install manual (MANUAL:Y). Set akun saat setup installer:
-      # User: Administrator | Pass: 12345678
+      # Ghost Spectre = install manual. Set saat setup: Administrator / 12345678
+      # Setelah login, bat otomatis muncul di Desktop (Enable-RDP, Open-Shared, dll.)
       RAM_SIZE: "6G"
       CPU_CORES: "2"
       DISK_SIZE: "32G"
@@ -17,10 +17,11 @@ services:
       - NET_ADMIN
     ports:
       - 8006:8006
-      - 3389:3389/tcp
-      - 3389:3389/udp
+      - 8007:3389/tcp
+      - 8007:3389/udp
     volumes:
       - ./windows:/storage
       - ./shared:/shared
+      - ./oem:/oem
     restart: always
     stop_grace_period: 2m

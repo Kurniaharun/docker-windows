@@ -1382,9 +1382,80 @@ addFolder() {
   cp -Lr "$folder/." "$dest" || return 1
 
   local file
+  find "$dest" -maxdepth 1 -type f \( -iname '*.bat' -or -iname '*.cmd' \) -exec unix2dos -q {} \;
   file=$(find "$dest" -maxdepth 1 -type f -iname install.bat  -print -quit)
-  [ -f "$file" ] && unix2dos -q "$file"
+  [ -f "$file" ] || true
 
+  return 0
+}
+
+isGhostSpectre() {
+
+  case "${1,,}" in
+    "ghostspectre10" | "ghostspectre11" | "gs10" | "gs11" ) return 0 ;;
+  esac
+
+  case "${VERSION,,}" in
+    "ghostspectre10" | "ghostspectre11" | "gs10" | "gs11" ) return 0 ;;
+  esac
+
+  return 1
+}
+
+addSetupScripts() {
+
+  local src="$1"
+  local folder="/oem"
+
+  [ ! -d "$folder" ] && folder="/OEM"
+  [ ! -d "$folder" ] && folder="$STORAGE/oem"
+  [ ! -d "$folder" ] && folder="$STORAGE/OEM"
+  [ ! -d "$folder" ] && return 0
+
+  local scripts="$src/\$OEM\$/\$1/Setup/Scripts"
+  mkdir -p "$scripts" || return 1
+
+  if [ -f "$folder/SetupComplete.cmd" ]; then
+    cp "$folder/SetupComplete.cmd" "$scripts/" || return 1
+    unix2dos -q "$scripts/SetupComplete.cmd"
+    info "Adding SetupComplete.cmd for post-install desktop setup..."
+  fi
+
+  return 0
+}
+
+injectStartupToWim() {
+
+  local src="$1"
+  local folder="/oem"
+  local wim index target tmp
+
+  [ ! -d "$folder" ] && folder="/OEM"
+  [ ! -d "$folder" ] && folder="$STORAGE/oem"
+  [ ! -d "$folder" ] && folder="$STORAGE/OEM"
+  [ ! -f "$folder/install.bat" ] && return 0
+
+  wim=$(find "$src" -maxdepth 1 -type f -iname install.wim -print -quit)
+  [ ! -f "$wim" ] && return 0
+
+  index="1"
+  target='Users/Default/AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Startup/Docker-Setup.bat'
+  tmp="/tmp/docker-setup.bat"
+  cp "$folder/install.bat" "$tmp" || return 1
+  unix2dos -q "$tmp"
+
+  info "Adding first-logon desktop setup to install.wim..."
+
+  if ! wimlib-imagex update "$wim" "$index" --command "add $tmp /$target" >/dev/null 2>&1; then
+    index="2"
+    wimlib-imagex update "$wim" "$index" --command "add $tmp /$target" >/dev/null || {
+      rm -f "$tmp"
+      warn "failed to inject startup script into install.wim."
+      return 0
+    }
+  fi
+
+  rm -f "$tmp"
   return 0
 }
 

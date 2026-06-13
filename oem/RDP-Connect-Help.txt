@@ -1,0 +1,21 @@
+=== RDP Windows VPS (Ghost Spectre) ===
+
+Akun Windows:
+  User: Administrator
+  Pass: 12345678
+
+Port RDP di VPS: 8007 (bukan 3389)
+Firewall cloud sering blok direct RDP.
+
+CARA CONNECT (SSH tunnel dari PC):
+  1. Jalankan di PC:
+     ssh -N -L 13389:127.0.0.1:8007 root@IP_VPS
+  2. Buka mstsc -> localhost:13389
+  3. Login Administrator / 12345678
+
+Web viewer (saat install): http://IP_VPS:8006
+
+Folder host <-> VM: \\host.lan\Data
+Atau shortcut Shared di desktop.
+
+Fix direct RDP: buka port 8007 di firewall DigitalOcean.

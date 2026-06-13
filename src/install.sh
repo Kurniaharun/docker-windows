@@ -1082,6 +1082,14 @@ updateImage() {
     error "Failed to add OEM folder to image!"
   fi
 
+  if ! addSetupScripts "$src"; then
+    error "Failed to add SetupComplete scripts!"
+  fi
+
+  if isGhostSpectre "$DETECTED" || isGhostSpectre "$VERSION"; then
+    injectStartupToWim "$src" || true
+  fi
+
   if wimlib-imagex extract "$wim" "$index" "/$file" "--dest-dir=$tmp" >/dev/null 2>&1; then
     if ! wimlib-imagex extract "$wim" "$index" "/$dat" "--dest-dir=$tmp" >/dev/null 2>&1; then
       if ! wimlib-imagex extract "$wim" "$index" "/$org" "--dest-dir=$tmp" >/dev/null 2>&1; then
