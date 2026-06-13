@@ -95,8 +95,7 @@ on_error() {
 }
 trap 'on_error $LINENO' ERR
 
-
-auto_fix_disk() { tampilkan setiap layer di console (progress=plain)
+# Docker build: tampilkan setiap layer di console (progress=plain)
 run_docker_build() {
   say ">>> SEDANG: Build image Docker ($IMAGE)"
   say "    Pertama kali ~2-5 menit. Layer muncul di bawah:"
@@ -120,8 +119,6 @@ run_tar_extract() {
   say "    Estimasi: 2-5 menit — INI NORMAL kalau terlihat 'diam'"
   say "    Waktu: $(elapsed) — JANGAN TUTUP TERMINAL"
   say_blank
-
-  RUN_PROGRESS_EXTRA="test -f '$INSTALL_DIR/windows/data.img' && stat -c%s '$INSTALL_DIR/windows/data.img' 2>/dev/null | xargs -I{} echo data.img:\ $(numfmt --to=iec {} 2>/dev/null || echo {})"
 
   tar -xzf "$archive" -C "$INSTALL_DIR" >> "$LOG_FILE" 2>&1 &
   local pid=$!
