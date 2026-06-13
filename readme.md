@@ -39,9 +39,11 @@ Log lengkap: `/var/log/ghostspectre-install.log` — console menampilkan status 
 
 | Setelah selesai | |
 |---|---|
+| IP RDP | `IP_VPS` |
+| PORT RDP | `8007` |
+| Connect | `IP_VPS:8007` → `Administrator` / `12345678` |
 | Web | `http://IP_VPS:8006` |
-| RDP tunnel | `ssh -N -L 13389:127.0.0.1:8007 root@IP_VPS` |
-| RDP | `localhost:13389` → `Administrator` / `12345678` |
+| Tunnel (jika firewall blok) | `ssh -N -L 13389:127.0.0.1:8007 root@IP_VPS` → `localhost:13389` |
 
 ## Features ✨
 

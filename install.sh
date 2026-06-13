@@ -18,6 +18,8 @@ INSTALL_DIR="${INSTALL_DIR:-/root/docker-windows}"
 COMPOSE="compose.ghostspectre.yml"
 IMAGE="dockurr/windows:ghostspectre"
 CONTAINER="windows"
+RDP_PORT="${RDP_PORT:-8007}"
+WEB_PORT="${WEB_PORT:-8006}"
 LOG_FILE="${LOG_FILE:-/var/log/ghostspectre-install.log}"
 STEP=0
 TOTAL_STEPS=7
@@ -89,6 +91,30 @@ file_disk_bytes() {
 
 file_virtual_bytes() {
   stat -c%s "$1" 2>/dev/null || stat -f%z "$1"
+}
+
+# Auto-detect IP publik VPS (DO metadata → skip private → fallback)
+detect_vps_ip() {
+  local ip=""
+  ip=$(curl -fsS --connect-timeout 2 \
+    http://169.254.169.254/metadata/v1/interfaces/public/0/ipv4/address 2>/dev/null) && {
+    echo "$ip"
+    return 0
+  }
+  for ip in $(hostname -I 2>/dev/null); do
+    [[ "$ip" =~ ^127\. ]] && continue
+    [[ "$ip" =~ ^10\. ]] && continue
+    [[ "$ip" =~ ^192\.168\. ]] && continue
+    [[ "$ip" =~ ^172\.(1[6-9]|2[0-9]|3[0-1])\. ]] && continue
+    [[ "$ip" == *:* ]] && continue
+    echo "$ip"
+    return 0
+  done
+  ip=$(curl -fsS --connect-timeout 3 https://api.ipify.org 2>/dev/null) && {
+    echo "$ip"
+    return 0
+  }
+  hostname -I 2>/dev/null | awk '{print $1}'
 }
 
 elapsed() {
@@ -286,7 +312,7 @@ auto_fix_restore() {
 dump_system_info() {
   say "──── Info VPS ────"
   say "  Hostname : $(hostname)"
-  say "  IP       : $(hostname -I 2>/dev/null | awk '{print $1}' || echo n/a)"
+  say "  IP       : $(detect_vps_ip)"
   say "  OS       : $(. /etc/os-release 2>/dev/null && echo "$PRETTY_NAME" || uname -a)"
   say "  CPU/RAM  : $(nproc) core | $(free -h 2>/dev/null | awk '/Mem:/{print $2" RAM"}')"
   say "  Disk     : $(df -h / | tail -1 | awk '{print $4" kosong / "$2" total"}')"
@@ -462,14 +488,19 @@ done
 log_ok "Container started"
 verify_windows
 
-IP=$(hostname -I | awk '{print $1}')
+IP=$(detect_vps_ip)
 
 say_blank
 banner "INSTALL SELESAI — $(elapsed)"
-say "  Web viewer : http://${IP}:8006"
-say "  RDP tunnel : ssh -N -L 13389:127.0.0.1:8007 root@${IP}"
-say "  RDP        : localhost:13389"
+say "  IP RDP     : ${IP}"
+say "  PORT RDP   : ${RDP_PORT}"
+say "  Connect    : ${IP}:${RDP_PORT}"
 say "  User       : Administrator"
 say "  Password   : 12345678"
+say ""
+say "  Web viewer : http://${IP}:${WEB_PORT}"
 say "  Log        : $LOG_FILE"
+say ""
+say "  (Firewall cloud blok? Tunnel: ssh -N -L 13389:127.0.0.1:${RDP_PORT} root@${IP})"
+say "  (Lalu RDP ke localhost:13389)"
 say_blank

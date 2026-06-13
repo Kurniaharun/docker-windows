@@ -32,7 +32,11 @@ docker compose -f "$COMPOSE" up -d
 sleep 5
 docker compose -f "$COMPOSE" ps
 
+PUB_IP=$(curl -fsS --connect-timeout 2 http://169.254.169.254/metadata/v1/interfaces/public/0/ipv4/address 2>/dev/null \
+  || hostname -I | awk '{print $1}')
 echo ""
 echo "Selesai! Windows langsung boot dari golden image."
-echo "  Web : http://$(hostname -I | awk '{print $1}'):8006"
-echo "  RDP : port 8007 (pakai SSH tunnel)"
+echo "  IP RDP   : ${PUB_IP}"
+echo "  PORT RDP : 8007"
+echo "  Connect  : ${PUB_IP}:8007"
+echo "  Web      : http://${PUB_IP}:8006"
