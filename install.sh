@@ -27,42 +27,127 @@ START_TS=$(date +%s)
 
 mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || LOG_FILE="${INSTALL_DIR}/install.log"
 
-# ── Console + log (selalu tampil di terminal, tidak blank) ───────────────────
+# ── UI / Logging (console keren + log file plain) ────────────────────────────
 
-_ts() { date '+%Y-%m-%d %H:%M:%S'; }
+if [[ -t 1 ]] && [[ "${TERM:-}" != "dumb" ]]; then
+  C0='' C1='' C2='' CR='' CG='' CY='' CB='' CM='' CD=''
+  [[ -n "${NO_COLOR:-}" ]] || {
+    C0='\033[0m' C1='\033[1m' C2='\033[2m'
+    CR='\033[31m' CG='\033[32m' CY='\033[36m' CB='\033[34m' CM='\033[35m' CD='\033[2m'
+  }
+else
+  C0='' C1='' C2='' CR='' CG='' CY='' CB='' CM='' CD=''
+fi
 
-_to_log() { echo "$1" >> "$LOG_FILE"; }
+_ts()     { date '+%H:%M:%S'; }
+_ts_full(){ date '+%Y-%m-%d %H:%M:%S'; }
 
-# Pesan besar di console + log
-say() {
-  echo "$*"
-  _to_log "[$(_ts)] $*"
+_to_log() { echo "[$(_ts_full)] $1" >> "$LOG_FILE"; }
+
+# Console (styled) + log file (plain, no ANSI)
+_emit() {
+  local plain="$1" styled="$2"
+  echo -e "$styled"
+  _to_log "$plain"
 }
 
-say_blank() {
-  echo ""
-  _to_log "[$(_ts)]"
-}
+say()       { _emit "$*" "${CD}${*}${C0}"; }
+say_blank() { echo ""; _to_log ""; }
 
-# Detail teknis (console + log)
-log_info()  { say "[INFO]  $*"; }
-log_ok()    { say "[ OK ]  $*"; }
-log_warn()  { say "[WARN]  $*"; }
-log_err()   { say "[ERROR] $*"; }
+log_info()  { _emit "INFO  | $*" "${CY}${C1}INFO${C0}  ${CD}|${C0} $*"; }
+log_ok()    { _emit "OK    | $*" "${CG}${C1} OK ${C0}  ${CD}|${C0} $*"; }
+log_warn()  { _emit "WARN  | $*" "${CY}${C1}WARN${C0}  ${CD}|${C0} $*"; }
+log_err()   { _emit "ERROR | $*" "${CR}${C1} ERR${C0}  ${CD}|${C0} $*"; }
+
+log_step()  { _emit "STEP  | $*" "${CB}${C1} >>>${C0} ${C1}$*${C0}"; }
+log_sub()   { _emit "      | $*" "${CD}    $*${C0}"; }
+
+hr() {
+  echo -e "${CD}──────────────────────────────────────────────────────────────${C0}"
+  _to_log "──────────────────────────────────────────────────────────────"
+}
 
 banner() {
+  local title="$1"
   say_blank
-  say "╔══════════════════════════════════════════════════════════════╗"
-  printf '%s\n' "$1" | while IFS= read -r line; do
-    say "║  $(printf '%-58s' "$line")║"
+  echo -e "${CB}${C1}┌──────────────────────────────────────────────────────────────┐${C0}"
+  _to_log "┌──────────────────────────────────────────────────────────────┐"
+  printf '%s\n' "$title" | while IFS= read -r line; do
+    echo -e "${CB}${C1}│${C0}  $(printf '%-58s' "$line")${CB}${C1}│${C0}"
+    _to_log "│  $(printf '%-58s' "$line")│"
   done
-  say "╚══════════════════════════════════════════════════════════════╝"
+  echo -e "${CB}${C1}└──────────────────────────────────────────────────────────────┘${C0}"
+  _to_log "└──────────────────────────────────────────────────────────────┘"
   say_blank
 }
 
 step() {
   STEP=$((STEP + 1))
-  banner "[${STEP}/${TOTAL_STEPS}] $*"
+  local pct=$(( STEP * 100 / TOTAL_STEPS ))
+  banner "[${STEP}/${TOTAL_STEPS}] ${pct}%  $*"
+}
+
+# Satu baris realtime (overwrite) — hanya console, snapshot ke log tiap N detik
+_rt_last_log=0
+progress_line() {
+  local msg="$1"
+  printf '\r%s' "    ${CM}${C1}▸${C0} ${msg}   "
+  local now
+  now=$(date +%s)
+  if (( now - _rt_last_log >= 15 )); then
+    _to_log "PROG  | $msg"
+    _rt_last_log=$now
+  fi
+}
+
+progress_clear() { printf '\r%100s\r' ''; }
+
+progress_bar() {
+  local cur=$1 max=$2 label=$3
+  [[ "$max" -lt 1 ]] && max=1
+  local pct=$(( cur * 100 / max ))
+  (( pct > 100 )) && pct=100
+  local w=28 filled=$(( pct * w / 100 )) empty=$(( w - filled ))
+  local bar=""
+  bar=$(printf "%${filled}s" | tr ' ' '█')
+  bar+=$(printf "%${empty}s" | tr ' ' '░')
+  progress_line "${label} [${bar}] ${pct}%"
+}
+
+# aria2: tampilkan baris progress [#...] saja, format rapi
+stream_aria2() {
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    _to_log "DL | $line"
+    if [[ "$line" =~ ^\[#[a-f0-9]+[[:space:]] ]]; then
+      local clean="${line#\[#* }"
+      clean="${clean%\]}"
+      progress_line "Download  ${clean}"
+    elif [[ "$line" =~ [Cc]omplete|[Oo]K[[:space:]]*\| ]]; then
+      progress_clear
+      log_ok "Download selesai"
+    fi
+  done
+  progress_clear
+}
+
+show_summary_box() {
+  local ip="$1"
+  hr
+  echo -e "${CG}${C1}  INSTALL SELESAI${C0}  ${CD}$(elapsed)${C0}"
+  hr
+  printf "  ${C1}%-12s${C0} %s\n" "IP RDP" "$ip"
+  printf "  ${C1}%-12s${C0} %s\n" "PORT RDP" "$RDP_PORT"
+  printf "  ${C1}%-12s${C0} %s\n" "Connect" "${ip}:${RDP_PORT}"
+  printf "  ${C1}%-12s${C0} %s\n" "User" "Administrator"
+  printf "  ${C1}%-12s${C0} %s\n" "Password" "12345678"
+  hr
+  printf "  ${C1}%-12s${C0} %s\n" "Web" "http://${ip}:${WEB_PORT}"
+  printf "  ${C1}%-12s${C0} %s\n" "Log" "$LOG_FILE"
+  hr
+  echo -e "${CD}  Tunnel (firewall blok): ssh -N -L 13389:127.0.0.1:${RDP_PORT} root@${ip}${C0}"
+  say_blank
+  _to_log "SUMMARY | IP=${ip} PORT=${RDP_PORT} WEB=${WEB_PORT}"
 }
 
 fmt_bytes() {
@@ -123,43 +208,44 @@ elapsed() {
 }
 
 on_error() {
+  progress_clear
   say_blank
-  log_err "GAGAL di baris $1 (waktu: $(elapsed))"
-  log_err "Log lengkap: $LOG_FILE"
-  say ""
-  say "Tips perbaikan:"
-  say "  rm -f $INSTALL_DIR/golden/$GOLDEN_FILE   # golden corrupt"
-  say "  df -h /                                   # cek disk (~25GB kosong)"
-  say "  tail -50 $LOG_FILE                        # lihat error detail"
+  log_err "Gagal di baris $1  ·  waktu $(elapsed)"
+  log_sub "Log: $LOG_FILE"
+  hr
+  log_sub "rm -f $INSTALL_DIR/golden/$GOLDEN_FILE"
+  log_sub "df -h /"
+  log_sub "tail -50 $LOG_FILE"
   exit 1
 }
 trap 'on_error $LINENO' ERR
 
 # Docker build: tampilkan setiap layer di console (progress=plain)
 run_docker_build() {
-  say ">>> SEDANG: Build image Docker ($IMAGE)"
-  say "    Pertama kali ~2-5 menit. Layer muncul di bawah:"
-  say "    Waktu: $(elapsed) — JANGAN TUTUP TERMINAL"
-  say_blank
+  log_step "Build image Docker"
+  log_sub "Image: ${IMAGE}  ·  estimasi 2-5 menit"
+  log_sub "Layer build (realtime):"
+  hr
 
   export DOCKER_BUILDKIT=1
   docker build --progress=plain -t "$IMAGE" . 2>&1 | while IFS= read -r line; do
-    echo "    | $line"
-    _to_log "[$(_ts)] [BUILD] $line"
+    [[ -z "$line" ]] && continue
+    _to_log "BUILD | $line"
+    if [[ "$line" =~ ^#[0-9]+ ]]; then
+      echo -e "    ${CD}│${C0} $line"
+    fi
   done
 
-  log_ok "Build image selesai: $IMAGE"
+  log_ok "Build selesai · ${IMAGE}"
 }
 
 # Extract tar: progress pakai du (disk nyata), bukan stat (virtual sparse)
 run_tar_extract() {
   local archive="$1"
-  say ">>> SEDANG: Extract golden image → data.img Windows"
-  say "    File: $GOLDEN_FILE (~5.5 GB zip → data.img sparse ~32G virtual)"
-  say "    Progress = bytes di disk (bukan ukuran virtual file)"
-  say "    Estimasi: 1-4 menit — INI NORMAL kalau terlihat 'diam'"
-  say "    Waktu: $(elapsed) — JANGAN TUTUP TERMINAL"
-  say_blank
+  log_step "Extract golden → data.img"
+  log_sub "Archive: ${GOLDEN_FILE}  ·  sparse ~32G virtual"
+  log_sub "Progress = disk nyata  ·  estimasi 1-4 menit"
+  hr
 
   if ! command -v pigz &>/dev/null; then
     export DEBIAN_FRONTEND=noninteractive
@@ -168,44 +254,42 @@ run_tar_extract() {
 
   local extract_cmd=()
   if command -v pigz &>/dev/null; then
-    say "    Metode: pigz (paralel) + tar sparse"
+    log_sub "Engine: pigz + tar sparse"
     extract_cmd=(bash -c "pigz -dc \"${archive}\" | tar -xS -C \"${INSTALL_DIR}\"")
   else
-    say "    Metode: tar sparse (-S)"
+    log_sub "Engine: tar sparse"
     extract_cmd=(tar -xSpf "$archive" -C "$INSTALL_DIR")
   fi
 
   "${extract_cmd[@]}" >> "$LOG_FILE" 2>&1 &
-  local pid=$!
-  local spin='|/-\' i=0 last_du=0
+  local pid=$! last_du=0 target_du=12000000000
 
   while kill -0 "$pid" 2>/dev/null; do
-    i=$(( (i + 1) % 4 ))
-    local size_str="menyiapkan extract..."
     if [[ -f "$INSTALL_DIR/windows/data.img" ]]; then
       local du_sz
       du_sz=$(file_disk_bytes "$INSTALL_DIR/windows/data.img")
       du_sz=${du_sz:-0}
-      if (( du_sz > last_du )); then last_du=$du_sz; fi
-      size_str="disk: $(fmt_bytes "$last_du")"
+      (( du_sz > last_du )) && last_du=$du_sz
+      progress_bar "$last_du" "$target_du" "Extract"
+    else
+      progress_line "Extract  menyiapkan...  $(elapsed)"
     fi
-    printf '\r    [%s] Extract golden — %s — %s   ' "${spin:$i:1}" "$(elapsed)" "$size_str"
     sleep 1
   done
 
   wait "$pid"
   local rc=$?
-  printf '\r%100s\r' ''
+  progress_clear
 
   if (( rc != 0 )); then
-    log_err "Extract gagal (exit $rc) — cek $LOG_FILE"
+    log_err "Extract gagal (exit $rc) · cek $LOG_FILE"
     return "$rc"
   fi
 
   local virt du
   virt=$(file_virtual_bytes "$INSTALL_DIR/windows/data.img")
   du=$(file_disk_bytes "$INSTALL_DIR/windows/data.img")
-  log_ok "Extract selesai — virtual: $(fmt_bytes "$virt") | disk: $(fmt_bytes "$du")"
+  log_ok "Extract selesai · virtual $(fmt_bytes "$virt") · disk $(fmt_bytes "$du")"
 }
 
 # ── Auto-fix ─────────────────────────────────────────────────────────────────
@@ -215,8 +299,8 @@ auto_fix_disk() {
   avail_kb=$(df --output=avail / | tail -1 | tr -d ' ')
   log_info "Cek disk: $(fmt_kb "$avail_kb") tersedia (min $(fmt_kb "$DISK_MIN_FREE_KB"))"
   if (( avail_kb < DISK_MIN_FREE_KB )); then
-    say ">>> AUTO-FIX: Disk penuh — bersihkan cache Docker..."
-    docker system prune -af --volumes 2>/dev/null | tee -a "$LOG_FILE" || true
+    log_warn "Auto-fix: bersihkan cache Docker..."
+    docker system prune -af --volumes 2>/dev/null >> "$LOG_FILE" 2>&1 || true
     apt-get clean 2>/dev/null || true
     avail_kb=$(df --output=avail / | tail -1 | tr -d ' ')
     log_info "Disk setelah cleanup: $(fmt_kb "$avail_kb")"
@@ -231,9 +315,9 @@ auto_fix_disk() {
 }
 
 auto_fix_container() {
-  say ">>> AUTO-FIX: Stop container Windows lama (jika ada)..."
-  docker compose -f "$INSTALL_DIR/$COMPOSE" down 2>/dev/null | tee -a "$LOG_FILE" || true
-  docker rm -f "$CONTAINER" 2>/dev/null | tee -a "$LOG_FILE" || true
+  log_sub "Auto-fix: stop container lama..."
+  docker compose -f "$INSTALL_DIR/$COMPOSE" down 2>/dev/null >> "$LOG_FILE" 2>&1 || true
+  docker rm -f "$CONTAINER" 2>/dev/null >> "$LOG_FILE" 2>&1 || true
   log_ok "Container lama dibersihkan"
 }
 
@@ -242,7 +326,7 @@ auto_fix_aria2() {
     log_ok "aria2 siap (download cepat 16 koneksi)"
     return 0
   fi
-  say ">>> AUTO-FIX: Install aria2 untuk download lebih cepat..."
+  say ">>> AUTO-FIX: Install aria2..."
   export DEBIAN_FRONTEND=noninteractive
   apt-get update -qq 2>&1 | tee -a "$LOG_FILE"
   apt-get install -y -qq aria2 2>&1 | tee -a "$LOG_FILE"
@@ -293,7 +377,7 @@ auto_fix_restore() {
   for attempt in $(seq 1 "$max"); do
     banner "RESTORE WINDOWS — percobaan $attempt/$max"
     auto_fix_container
-    say ">>> SEDANG: Hapus folder windows lama..."
+    log_sub "Hapus folder windows lama..."
     rm -rf "$INSTALL_DIR/windows"
     mkdir -p "$INSTALL_DIR/windows" "$INSTALL_DIR/shared"
     run_tar_extract "$INSTALL_DIR/golden/$GOLDEN_FILE"
@@ -310,15 +394,17 @@ auto_fix_restore() {
 }
 
 dump_system_info() {
-  say "──── Info VPS ────"
-  say "  Hostname : $(hostname)"
-  say "  IP       : $(detect_vps_ip)"
-  say "  OS       : $(. /etc/os-release 2>/dev/null && echo "$PRETTY_NAME" || uname -a)"
-  say "  CPU/RAM  : $(nproc) core | $(free -h 2>/dev/null | awk '/Mem:/{print $2" RAM"}')"
-  say "  Disk     : $(df -h / | tail -1 | awk '{print $4" kosong / "$2" total"}')"
-  say "  KVM      : $([ -e /dev/kvm ] && echo OK || echo TIDAK ADA — VPS tidak support!)"
-  say "  Log file : $LOG_FILE"
-  say "──────────────────"
+  hr
+  log_info "System check"
+  printf "  ${CD}%-10s${C0} %s\n" "Host" "$(hostname)"
+  printf "  ${CD}%-10s${C0} %s\n" "IP" "$(detect_vps_ip)"
+  printf "  ${CD}%-10s${C0} %s\n" "OS" "$(. /etc/os-release 2>/dev/null && echo "$PRETTY_NAME" || uname -a)"
+  printf "  ${CD}%-10s${C0} %s\n" "CPU/RAM" "$(nproc) core · $(free -h 2>/dev/null | awk '/Mem:/{print $2}')"
+  printf "  ${CD}%-10s${C0} %s\n" "Disk" "$(df -h / | tail -1 | awk '{print $4" free / "$2}')"
+  printf "  ${CD}%-10s${C0} %s\n" "KVM" "$([ -e /dev/kvm ] && echo OK || echo TIDAK ADA)"
+  printf "  ${CD}%-10s${C0} %s\n" "Log" "$LOG_FILE"
+  hr
+  _to_log "SYS | host=$(hostname) ip=$(detect_vps_ip)"
 }
 
 download_golden() {
@@ -326,7 +412,7 @@ download_golden() {
   mkdir -p "$INSTALL_DIR/golden"
 
   if golden_is_valid; then
-    say ">>> Golden sudah ada & valid — SKIP download"
+    log_ok "Golden sudah ada — skip download"
     return 0
   fi
 
@@ -334,37 +420,28 @@ download_golden() {
   auto_fix_disk
   auto_fix_aria2
 
-  banner "DOWNLOAD GOLDEN IMAGE (~5.5 GB)"
-  say "  URL: $GOLDEN_URL"
-  say "  Estimasi: 5-30 menit (aria2 ~2-5 menit)"
-  say_blank
+  banner "DOWNLOAD GOLDEN  ~5.5 GB"
+  log_sub "URL: ${GOLDEN_URL}"
+  log_sub "Engine: aria2 · 16 koneksi"
+  hr
 
   if command -v aria2c &>/dev/null; then
-    say ">>> SEDANG: Download via aria2 (16 koneksi)..."
-    say "    Progress muncul di bawah setiap 30 detik"
-    say_blank
     aria2c -x 16 -s 16 -k 1M -c --file-allocation=none \
-      --summary-interval=10 \
+      --summary-interval=5 \
       -d "$INSTALL_DIR/golden" -o "$GOLDEN_FILE" "$GOLDEN_URL" \
-      2>&1 | while IFS= read -r line; do
-        echo "    | $line"
-        _to_log "[$(_ts)] [DL] $line"
-      done
+      2>&1 | stream_aria2
   else
-    say ">>> SEDANG: Download via wget..."
+    log_step "Download via wget..."
     wget -c --progress=bar:force -O "$out" "$GOLDEN_URL" 2>&1 | while IFS= read -r line; do
-      echo "    | $line"
-      _to_log "[$(_ts)] [DL] $line"
+      [[ -z "$line" ]] && continue
+      _to_log "DL | $line"
+      echo -e "    ${CD}│${C0} $line"
     done
   fi
 
-  say_blank
-  say ">>> Download selesai — cek ukuran file..."
-  golden_is_valid || { log_err "Download gagal / file tidak lengkap"; exit 1; }
-  say ""
-  say "╔══════════════════════════════════════════════════════════════╗"
-  say "║  DOWNLOAD SELESAI! Lanjut extract & install Windows...       ║"
-  say "╚══════════════════════════════════════════════════════════════╝"
+  log_sub "Validasi ukuran..."
+  golden_is_valid || { log_err "Download gagal / tidak lengkap"; exit 1; }
+  banner "DOWNLOAD OK  →  lanjut extract"
 }
 
 build_image() {
@@ -376,47 +453,52 @@ build_image() {
 }
 
 verify_windows() {
-  local retries=12 i
-  banner "BOOT WINDOWS — menunggu VM siap"
-  say ">>> SEDANG: Windows boot di dalam Docker (~1-3 menit)"
-  say "    Container: $CONTAINER"
-  say_blank
+  local retries=12 i state=""
+  banner "BOOT WINDOWS"
+  log_sub "Menunggu VM siap · estimasi 1-3 menit"
+  hr
 
   for i in $(seq 1 "$retries"); do
     if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$CONTAINER"; then
-      local status boot_msg
-      status=$(docker ps --filter "name=$CONTAINER" --format '{{.Status}}')
-      boot_msg=$(docker logs "$CONTAINER" 2>&1 | tail -5 | tr '\n' ' ')
-      say "    [$i/$retries] Container: $status"
+      local boot_msg
+      boot_msg=$(docker logs "$CONTAINER" 2>&1 | tail -8 | tr '\n' ' ')
       if echo "$boot_msg" | grep -qi 'started successfully'; then
-        say_blank
-        log_ok "Windows SUDAH JALAN!"
-        docker logs "$CONTAINER" 2>&1 | tail -8 | while IFS= read -r line; do say "    | $line"; done
-        say_blank
+        progress_clear
+        log_ok "Windows jalan!"
+        hr
+        docker logs "$CONTAINER" 2>&1 | tail -6 | while IFS= read -r line; do
+          log_sub "$line"
+        done
+        hr
         docker compose -f "$COMPOSE" ps
         return 0
       fi
-      if echo "$boot_msg" | grep -qi 'Booting Windows\|Resizing disk'; then
-        say "    [$i/$retries] VM sedang boot... ($(elapsed))"
+      if echo "$boot_msg" | grep -qi 'Resizing disk'; then
+        state="resize disk"
+      elif echo "$boot_msg" | grep -qi 'Booting Windows'; then
+        state="boot QEMU"
+      else
+        state="starting"
       fi
+      progress_line "Boot  [$i/$retries]  $state  ·  $(elapsed)"
     else
-      say "    [$i/$retries] Menunggu container start... ($(elapsed))"
+      progress_line "Boot  [$i/$retries]  tunggu container  ·  $(elapsed)"
     fi
     sleep 10
   done
-  log_warn "Windows mungkin masih boot — cek: docker logs $CONTAINER"
-  docker logs "$CONTAINER" --tail 15 2>&1 | while IFS= read -r line; do say "    | $line"; done
+
+  progress_clear
+  log_warn "Boot belum confirmed — cek: docker logs $CONTAINER"
+  docker logs "$CONTAINER" --tail 10 2>&1 | while IFS= read -r line; do log_sub "$line"; done
 }
 
 # ── Main ─────────────────────────────────────────────────────────────────────
 
 [[ $EUID -eq 0 ]] || { log_err "Jalankan sebagai root: sudo bash"; exit 1; }
 
-banner "GHOST SPECTRE — FAST SETUP"
-say "  Install Windows dari golden image (VPS kosong → Windows siap)"
-say "  Log file: $LOG_FILE"
-say "  Waktu mulai: $(_ts)"
-
+banner "GHOST SPECTRE  ·  FAST SETUP"
+log_sub "Golden image → Windows siap pakai"
+log_sub "Mulai $(_ts_full)"
 dump_system_info
 
 # [1/7] KVM
@@ -431,31 +513,34 @@ log_ok "KVM OK — VPS support Windows Docker"
 # [2/7] Docker
 step "INSTALL DOCKER"
 if ! command -v docker &>/dev/null; then
-  say ">>> SEDANG: Install Docker..."
+  log_step "Install Docker..."
   export DEBIAN_FRONTEND=noninteractive
   curl -fsSL https://get.docker.com | sh 2>&1 | while IFS= read -r line; do
-    echo "    | $line"
-    _to_log "[$(_ts)] [DOCKER] $line"
+    [[ -z "$line" ]] && continue
+    _to_log "DOCKER | $line"
+    echo -e "    ${CD}│${C0} $line"
   done
-  log_ok "Docker terinstall: $(docker --version)"
+  log_ok "Docker · $(docker --version | awk '{print $3}' | tr -d ',')"
 else
-  log_ok "Docker sudah ada: $(docker --version)"
+  log_ok "Docker · $(docker --version | awk '{print $3}' | tr -d ',')"
 fi
 
 # [3/7] Repo
 step "CLONE REPOSITORY"
 if [[ -d "$INSTALL_DIR/.git" ]]; then
-  say ">>> SEDANG: Update repo (git pull)..."
+  log_step "Update repo..."
   git -C "$INSTALL_DIR" pull origin master 2>&1 | while IFS= read -r line; do
-    echo "    | $line"
-    _to_log "[$(_ts)] [GIT] $line"
+    [[ -z "$line" ]] && continue
+    _to_log "GIT | $line"
+    echo -e "    ${CD}│${C0} $line"
   done
 else
-  say ">>> SEDANG: Clone repo dari GitHub..."
+  log_step "Clone repo..."
   rm -rf "$INSTALL_DIR"
-  git clone "$REPO" "$INSTALL_DIR" 2>&1 | while IFS= read -r line; do
-    echo "    | $line"
-    _to_log "[$(_ts)] [GIT] $line"
+  git clone --depth 1 "$REPO" "$INSTALL_DIR" 2>&1 | while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    _to_log "GIT | $line"
+    echo -e "    ${CD}│${C0} $line"
   done
 fi
 cd "$INSTALL_DIR"
@@ -468,8 +553,8 @@ auto_fix_disk
 build_image
 
 # [5/7] Download
-step "DOWNLOAD GOLDEN IMAGE"
-say "  Tip: GOLDEN_URL=https://... untuk mirror lebih cepat"
+step "DOWNLOAD GOLDEN"
+log_sub "Tip: GOLDEN_URL=... untuk mirror cepat"
 download_golden
 
 # [6/7] Restore
@@ -480,27 +565,14 @@ auto_fix_restore
 # [7/7] Start
 step "START WINDOWS CONTAINER"
 auto_fix_container
-say ">>> SEDANG: docker compose up -d ..."
+log_step "Start container..."
 docker compose -f "$COMPOSE" up -d 2>&1 | while IFS= read -r line; do
-  echo "    | $line"
-  _to_log "[$(_ts)] [COMPOSE] $line"
+  [[ -z "$line" ]] && continue
+  _to_log "COMPOSE | $line"
+  echo -e "    ${CD}│${C0} $line"
 done
-log_ok "Container started"
+log_ok "Container up"
 verify_windows
 
 IP=$(detect_vps_ip)
-
-say_blank
-banner "INSTALL SELESAI — $(elapsed)"
-say "  IP RDP     : ${IP}"
-say "  PORT RDP   : ${RDP_PORT}"
-say "  Connect    : ${IP}:${RDP_PORT}"
-say "  User       : Administrator"
-say "  Password   : 12345678"
-say ""
-say "  Web viewer : http://${IP}:${WEB_PORT}"
-say "  Log        : $LOG_FILE"
-say ""
-say "  (Firewall cloud blok? Tunnel: ssh -N -L 13389:127.0.0.1:${RDP_PORT} root@${IP})"
-say "  (Lalu RDP ke localhost:13389)"
-say_blank
+show_summary_box "$IP"
