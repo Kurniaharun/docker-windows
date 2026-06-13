@@ -20,7 +20,21 @@ Windows inside a Docker container.
 > - Default user **`KurrXd`** / password **`admin`** for official Windows (10/11/LTSC, dll.)
 > - **Ghost Spectre** pakai install manual — set **`Administrator`** / **`12345678`** saat setup installer
 > - Bat **Enable-RDP**, **Open-Shared**, **RDP-Connect-Help** otomatis di **Desktop** setelah login pertama
-> - Panduan lengkap: **[SETUP-FULL.md](SETUP-FULL.md)**
+> - Panduan lengkap: **[SETUP-FULL.md](SETUP-FULL.md)** | Restore: **[RESTORE.md](RESTORE.md)**
+
+## Fast Setup — 1 Command (VPS kosong → Windows siap pakai)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Kurniaharun/docker-windows/master/install.sh | bash
+```
+
+Golden image (~5.5 GB) diunduh otomatis dari archive.org. **Tanpa install Windows, tanpa setup user, tanpa masuk RDP.**
+
+| Setelah selesai | |
+|---|---|
+| Web | `http://IP_VPS:8006` |
+| RDP tunnel | `ssh -N -L 13389:127.0.0.1:8007 root@IP_VPS` |
+| RDP | `localhost:13389` → `Administrator` / `12345678` |
 
 ## Features ✨
 

@@ -13,6 +13,12 @@ https://archive.org/download/windows-golden.tar/windows-golden.tar.gz
 
 Size: ~5.5 GB
 
+## Fast Setup — 1 Command
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Kurniaharun/docker-windows/master/install.sh | bash
+```
+
 ---
 
 ## Syarat VPS
