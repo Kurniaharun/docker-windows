@@ -5,6 +5,7 @@
 set -euo pipefail
 
 GOLDEN_URL="${GOLDEN_URL:-https://archive.org/download/windows-golden.tar/windows-golden.tar.gz}"
+GOLDEN_MIN_BYTES="${GOLDEN_MIN_BYTES:-5000000000}"  # ~5 GB, archive ~5.5 GB
 REPO="${REPO:-https://github.com/Kurniaharun/docker-windows.git}"
 INSTALL_DIR="${INSTALL_DIR:-/root/docker-windows}"
 COMPOSE="compose.ghostspectre.yml"
@@ -42,11 +43,33 @@ chmod +x scripts/*.sh 2>/dev/null || true
 echo "[4/7] Build Docker image..."
 docker build -t dockurr/windows:ghostspectre .
 
+golden_is_valid() {
+  local out="golden/windows-golden.tar.gz"
+  [[ -f "$out" ]] || return 1
+  local size
+  size=$(stat -c%s "$out" 2>/dev/null || stat -f%z "$out")
+  if (( size < GOLDEN_MIN_BYTES )); then
+    echo "  Golden corrupt/tidak lengkap ($(numfmt --to=iec "$size" 2>/dev/null || echo "${size} bytes"), butuh ~5.5G)"
+    return 1
+  fi
+  if ! gzip -t "$out" 2>/dev/null; then
+    echo "  Golden corrupt (gzip check gagal)"
+    return 1
+  fi
+  return 0
+}
+
 download_golden() {
   local out="golden/windows-golden.tar.gz"
-  if [[ -f "$out" ]] && tar -tzf "$out" &>/dev/null; then
+
+  if golden_is_valid; then
     echo "  Golden sudah ada & valid, skip download."
     return 0
+  fi
+
+  if [[ -f "$out" ]]; then
+    echo "  Hapus file golden rusak/tidak lengkap..."
+    rm -f "$out"
   fi
 
   # aria2 multi-connection jauh lebih cepat dari archive.org vs wget single-thread
@@ -64,6 +87,8 @@ download_golden() {
     echo "  Download via wget (fallback)..."
     wget -c -O "$out" "$GOLDEN_URL"
   fi
+
+  golden_is_valid || { echo "ERROR: Download golden gagal atau masih corrupt."; exit 1; }
 }
 
 echo "[5/7] Download golden image (~5.5 GB)..."
