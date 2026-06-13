@@ -8,10 +8,10 @@ Panduan restore Windows dari backup `windows-golden.tar.gz`.
 ## Link Golden Image
 
 ```
-LINK_ARCHIVE_ORG: (isi nanti)
+https://archive.org/download/windows-golden.tar/windows-golden.tar.gz
 ```
 
-> Ganti `LINK_ARCHIVE_ORG` di bawah dengan link archive.org kamu.
+Size: ~5.5 GB
 
 ---
 
@@ -45,7 +45,7 @@ docker build -t dockurr/windows:ghostspectre .
 mkdir -p golden
 
 # Ganti LINK di bawah dengan link archive.org kamu
-wget -O golden/windows-golden.tar.gz "LINK_ARCHIVE_ORG"
+wget -O golden/windows-golden.tar.gz "https://archive.org/download/windows-golden.tar/windows-golden.tar.gz"
 ```
 
 Atau upload dari PC:
