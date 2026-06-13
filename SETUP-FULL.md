@@ -109,3 +109,28 @@ Mount di compose: `./oem:/oem`
 ## Windows resmi (bukan Ghost)
 
 Auto user **`KurrXd`** / **`admin`** via autounattend.
+
+---
+
+## Golden Image — Deploy auto tanpa setup ulang
+
+Setelah Windows + app + setting selesai, **backup `data.img`**:
+
+```bash
+./scripts/backup-golden.sh
+# Output: golden/windows-golden.tar.gz
+```
+
+**Next deploy** (VPS baru / reinstall) — langsung boot, **zero setup**:
+
+```bash
+# Upload golden/windows-golden.tar.gz ke VPS
+./scripts/restore-golden.sh
+docker compose -f compose.ghostspectre.yml up -d
+```
+
+Dari PC Windows:
+- **Backup:** double-click `backup-golden.bat`
+- **Restore:** double-click `restore-golden.bat`
+
+Yang ter-restore: user, RDP, app, setting — semua dari `data.img` kamu.
