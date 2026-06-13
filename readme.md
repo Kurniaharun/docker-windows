@@ -45,6 +45,108 @@ Log lengkap: `/var/log/ghostspectre-install.log` — console menampilkan status 
 | Web | `http://IP_VPS:8006` |
 | Tunnel (jika firewall blok) | `ssh -N -L 13389:127.0.0.1:8007 root@IP_VPS` → `localhost:13389` |
 
+---
+
+## Perintah Install — 1 Baris (Standalone)
+
+Jalankan di **VPS Linux root** dengan KVM (`/dev/kvm`). Semua command di bawah sudah include install Docker + clone repo.
+
+> **Login setelah selesai**
+> | Mode | User | Pass | RDP |
+> |---|---|---|---|
+> | Golden / Ghost Spectre | `Administrator` | `12345678` | `IP:8007` |
+> | Windows resmi (auto) | `KurrXd` | `admin` | `IP:3389` |
+
+### Ghost Spectre — Golden Image (boot langsung, tanpa install)
+
+Windows sudah jadi — download golden ~5.5 GB, extract `data.img`, langsung boot.
+
+| Versi | Command |
+|---|---|
+| **GS11** (default) | `curl -fsSL https://raw.githubusercontent.com/Kurniaharun/docker-windows/master/get.sh \| bash` |
+| **GS11** (alternatif git) | `git clone --depth 1 https://github.com/Kurniaharun/docker-windows.git /root/docker-windows && bash /root/docker-windows/install.sh` |
+| **GS11** (mirror golden) | `GOLDEN_URL=https://YOUR-MIRROR/windows-golden.tar.gz bash -c 'curl -fsSL https://raw.githubusercontent.com/Kurniaharun/docker-windows/master/get.sh \| bash'` |
+
+> Golden image saat ini = **Ghost Spectre 11** siap pakai. Untuk GS10 golden, backup sendiri via `./scripts/backup-golden.sh` lalu restore.
+
+---
+
+### Ghost Spectre — Fresh Install (download ISO otomatis dari archive.org)
+
+Install manual via web viewer `http://IP:8006` — set **`Administrator`** / **`12345678`** saat setup.
+
+| Versi | Command |
+|---|---|
+| **GS11** | `curl -fsSL https://get.docker.com \| sh && git clone --depth 1 https://github.com/Kurniaharun/docker-windows.git /root/docker-windows && cd /root/docker-windows && docker build -t dockurr/windows:ghostspectre . && docker compose -f compose.ghostspectre.yml up -d` |
+| **GS10** | `curl -fsSL https://get.docker.com \| sh && git clone --depth 1 https://github.com/Kurniaharun/docker-windows.git /root/docker-windows && cd /root/docker-windows && docker build -t dockurr/windows:ghostspectre . && docker compose -f compose.ghostspectre10.yml up -d` |
+
+---
+
+### Ghost Spectre — Fresh Install (ISO lokal / file ISO langsung)
+
+Ganti `/root/win.iso` dengan path ISO kamu di VPS. ISO **tidak** didownload — langsung mount ke `/boot.iso`.
+
+| Versi | Command |
+|---|---|
+| **GS11** (file ISO) | `curl -fsSL https://get.docker.com \| sh && git clone --depth 1 https://github.com/Kurniaharun/docker-windows.git /root/docker-windows && cd /root/docker-windows && docker build -t dockurr/windows:ghostspectre . && docker run -d --name windows --device=/dev/kvm --device=/dev/net/tun --cap-add NET_ADMIN -p 8006:8006 -p 8007:3389/tcp -p 8007:3389/udp -v /root/docker-windows/windows:/storage -v /root/docker-windows/shared:/shared -v /root/docker-windows/oem:/oem -v /root/win.iso:/boot.iso -e RAM_SIZE=6G -e CPU_CORES=2 -e DISK_SIZE=32G --stop-timeout 120 --restart always dockurr/windows:ghostspectre` |
+| **GS10** (file ISO) | `curl -fsSL https://get.docker.com \| sh && git clone --depth 1 https://github.com/Kurniaharun/docker-windows.git /root/docker-windows && cd /root/docker-windows && docker build -t dockurr/windows:ghostspectre . && docker run -d --name windows --device=/dev/kvm --device=/dev/net/tun --cap-add NET_ADMIN -p 8006:8006 -p 8007:3389/tcp -p 8007:3389/udp -v /root/docker-windows/windows:/storage -v /root/docker-windows/shared:/shared -v /root/docker-windows/oem:/oem -v /root/win.iso:/boot.iso -e RAM_SIZE=6G -e CPU_CORES=2 -e DISK_SIZE=32G --stop-timeout 120 --restart always dockurr/windows:ghostspectre` |
+| **GS11** (URL ISO langsung) | `curl -fsSL https://get.docker.com \| sh && git clone --depth 1 https://github.com/Kurniaharun/docker-windows.git /root/docker-windows && cd /root/docker-windows && docker build -t dockurr/windows:ghostspectre . && docker run -d --name windows --device=/dev/kvm --device=/dev/net/tun --cap-add NET_ADMIN -p 8006:8006 -p 8007:3389/tcp -p 8007:3389/udp -v /root/docker-windows/windows:/storage -v /root/docker-windows/shared:/shared -v /root/docker-windows/oem:/oem -e VERSION="https://archive.org/download/ghost-spectre-windows-11/WIN11.PRO.21H2.SUPERLITE%2BCOMPACT.X64.%28WPE%29%20%281%29.ISO" -e RAM_SIZE=6G -e CPU_CORES=2 -e DISK_SIZE=32G --stop-timeout 120 --restart always dockurr/windows:ghostspectre` |
+| **GS10** (URL ISO langsung) | `curl -fsSL https://get.docker.com \| sh && git clone --depth 1 https://github.com/Kurniaharun/docker-windows.git /root/docker-windows && cd /root/docker-windows && docker build -t dockurr/windows:ghostspectre . && docker run -d --name windows --device=/dev/kvm --device=/dev/net/tun --cap-add NET_ADMIN -p 8006:8006 -p 8007:3389/tcp -p 8007:3389/udp -v /root/docker-windows/windows:/storage -v /root/docker-windows/shared:/shared -v /root/docker-windows/oem:/oem -e VERSION="https://archive.org/download/ghost-spectre-windows-10/2009.SUPERLITE%2BCOMPACT.X64.U2.GHOSTSPECTRE.%28N%29.ISO" -e RAM_SIZE=6G -e CPU_CORES=2 -e DISK_SIZE=32G --stop-timeout 120 --restart always dockurr/windows:ghostspectre` |
+
+---
+
+### Windows Resmi & Lainnya — Fresh Install (auto download ISO)
+
+Install otomatis via autounattend. User default: **`KurrXd`** / **`admin`**. RDP port **3389**.
+
+Ganti `VERSION=XX` sesuai tabel. Image: `dockurr/windows` (tanpa build).
+
+| VERSION | Windows | Command (1 baris) |
+|---|---|---|
+| `11` | Windows 11 Pro | `curl -fsSL https://get.docker.com \| sh && git clone --depth 1 https://github.com/Kurniaharun/docker-windows.git /root/docker-windows && cd /root/docker-windows && docker run -d --name windows --device=/dev/kvm --device=/dev/net/tun --cap-add NET_ADMIN -p 8006:8006 -p 3389:3389/tcp -p 3389:3389/udp -v /root/docker-windows/windows:/storage -v /root/docker-windows/oem:/oem -e VERSION=11 -e RAM_SIZE=4G -e CPU_CORES=2 -e DISK_SIZE=64G --stop-timeout 120 --restart always dockurr/windows` |
+| `11l` | Windows 11 LTSC | `curl -fsSL https://get.docker.com \| sh && git clone --depth 1 https://github.com/Kurniaharun/docker-windows.git /root/docker-windows && cd /root/docker-windows && docker run -d --name windows --device=/dev/kvm --device=/dev/net/tun --cap-add NET_ADMIN -p 8006:8006 -p 3389:3389/tcp -p 3389:3389/udp -v /root/docker-windows/windows:/storage -v /root/docker-windows/oem:/oem -e VERSION=11l -e RAM_SIZE=4G -e CPU_CORES=2 -e DISK_SIZE=64G --stop-timeout 120 --restart always dockurr/windows` |
+| `11e` | Windows 11 Enterprise | `curl -fsSL https://get.docker.com \| sh && git clone --depth 1 https://github.com/Kurniaharun/docker-windows.git /root/docker-windows && cd /root/docker-windows && docker run -d --name windows --device=/dev/kvm --device=/dev/net/tun --cap-add NET_ADMIN -p 8006:8006 -p 3389:3389/tcp -p 3389:3389/udp -v /root/docker-windows/windows:/storage -v /root/docker-windows/oem:/oem -e VERSION=11e -e RAM_SIZE=4G -e CPU_CORES=2 -e DISK_SIZE=64G --stop-timeout 120 --restart always dockurr/windows` |
+| `10` | Windows 10 Pro | `curl -fsSL https://get.docker.com \| sh && git clone --depth 1 https://github.com/Kurniaharun/docker-windows.git /root/docker-windows && cd /root/docker-windows && docker run -d --name windows --device=/dev/kvm --device=/dev/net/tun --cap-add NET_ADMIN -p 8006:8006 -p 3389:3389/tcp -p 3389:3389/udp -v /root/docker-windows/windows:/storage -v /root/docker-windows/oem:/oem -e VERSION=10 -e RAM_SIZE=4G -e CPU_CORES=2 -e DISK_SIZE=64G --stop-timeout 120 --restart always dockurr/windows` |
+| `10l` | Windows 10 LTSC | `curl -fsSL https://get.docker.com \| sh && git clone --depth 1 https://github.com/Kurniaharun/docker-windows.git /root/docker-windows && cd /root/docker-windows && docker run -d --name windows --device=/dev/kvm --device=/dev/net/tun --cap-add NET_ADMIN -p 8006:8006 -p 3389:3389/tcp -p 3389:3389/udp -v /root/docker-windows/windows:/storage -v /root/docker-windows/oem:/oem -e VERSION=10l -e RAM_SIZE=4G -e CPU_CORES=2 -e DISK_SIZE=64G --stop-timeout 120 --restart always dockurr/windows` |
+| `10e` | Windows 10 Enterprise | `curl -fsSL https://get.docker.com \| sh && git clone --depth 1 https://github.com/Kurniaharun/docker-windows.git /root/docker-windows && cd /root/docker-windows && docker run -d --name windows --device=/dev/kvm --device=/dev/net/tun --cap-add NET_ADMIN -p 8006:8006 -p 3389:3389/tcp -p 3389:3389/udp -v /root/docker-windows/windows:/storage -v /root/docker-windows/oem:/oem -e VERSION=10e -e RAM_SIZE=4G -e CPU_CORES=2 -e DISK_SIZE=64G --stop-timeout 120 --restart always dockurr/windows` |
+| `8e` | Windows 8.1 Enterprise | `curl -fsSL https://get.docker.com \| sh && git clone --depth 1 https://github.com/Kurniaharun/docker-windows.git /root/docker-windows && cd /root/docker-windows && docker run -d --name windows --device=/dev/kvm --device=/dev/net/tun --cap-add NET_ADMIN -p 8006:8006 -p 3389:3389/tcp -p 3389:3389/udp -v /root/docker-windows/windows:/storage -v /root/docker-windows/oem:/oem -e VERSION=8e -e RAM_SIZE=4G -e CPU_CORES=2 -e DISK_SIZE=64G --stop-timeout 120 --restart always dockurr/windows` |
+| `7u` | Windows 7 Ultimate | `curl -fsSL https://get.docker.com \| sh && git clone --depth 1 https://github.com/Kurniaharun/docker-windows.git /root/docker-windows && cd /root/docker-windows && docker run -d --name windows --device=/dev/kvm --device=/dev/net/tun --cap-add NET_ADMIN -p 8006:8006 -p 3389:3389/tcp -p 3389:3389/udp -v /root/docker-windows/windows:/storage -v /root/docker-windows/oem:/oem -e VERSION=7u -e RAM_SIZE=4G -e CPU_CORES=2 -e DISK_SIZE=64G --stop-timeout 120 --restart always dockurr/windows` |
+| `vu` | Windows Vista Ultimate | `curl -fsSL https://get.docker.com \| sh && git clone --depth 1 https://github.com/Kurniaharun/docker-windows.git /root/docker-windows && cd /root/docker-windows && docker run -d --name windows --device=/dev/kvm --device=/dev/net/tun --cap-add NET_ADMIN -p 8006:8006 -p 3389:3389/tcp -p 3389:3389/udp -v /root/docker-windows/windows:/storage -v /root/docker-windows/oem:/oem -e VERSION=vu -e RAM_SIZE=4G -e CPU_CORES=2 -e DISK_SIZE=64G --stop-timeout 120 --restart always dockurr/windows` |
+| `xp` | Windows XP Pro | `curl -fsSL https://get.docker.com \| sh && git clone --depth 1 https://github.com/Kurniaharun/docker-windows.git /root/docker-windows && cd /root/docker-windows && docker run -d --name windows --device=/dev/kvm --device=/dev/net/tun --cap-add NET_ADMIN -p 8006:8006 -p 3389:3389/tcp -p 3389:3389/udp -v /root/docker-windows/windows:/storage -v /root/docker-windows/oem:/oem -e VERSION=xp -e RAM_SIZE=2G -e CPU_CORES=2 -e DISK_SIZE=32G --stop-timeout 120 --restart always dockurr/windows` |
+| `2k` | Windows 2000 Pro | `curl -fsSL https://get.docker.com \| sh && git clone --depth 1 https://github.com/Kurniaharun/docker-windows.git /root/docker-windows && cd /root/docker-windows && docker run -d --name windows --device=/dev/kvm --device=/dev/net/tun --cap-add NET_ADMIN -p 8006:8006 -p 3389:3389/tcp -p 3389:3389/udp -v /root/docker-windows/windows:/storage -v /root/docker-windows/oem:/oem -e VERSION=2k -e RAM_SIZE=2G -e CPU_CORES=2 -e DISK_SIZE=32G --stop-timeout 120 --restart always dockurr/windows` |
+| `2025` | Windows Server 2025 | `curl -fsSL https://get.docker.com \| sh && git clone --depth 1 https://github.com/Kurniaharun/docker-windows.git /root/docker-windows && cd /root/docker-windows && docker run -d --name windows --device=/dev/kvm --device=/dev/net/tun --cap-add NET_ADMIN -p 8006:8006 -p 3389:3389/tcp -p 3389:3389/udp -v /root/docker-windows/windows:/storage -v /root/docker-windows/oem:/oem -e VERSION=2025 -e RAM_SIZE=4G -e CPU_CORES=2 -e DISK_SIZE=64G --stop-timeout 120 --restart always dockurr/windows` |
+| `2022` | Windows Server 2022 | `curl -fsSL https://get.docker.com \| sh && git clone --depth 1 https://github.com/Kurniaharun/docker-windows.git /root/docker-windows && cd /root/docker-windows && docker run -d --name windows --device=/dev/kvm --device=/dev/net/tun --cap-add NET_ADMIN -p 8006:8006 -p 3389:3389/tcp -p 3389:3389/udp -v /root/docker-windows/windows:/storage -v /root/docker-windows/oem:/oem -e VERSION=2022 -e RAM_SIZE=4G -e CPU_CORES=2 -e DISK_SIZE=64G --stop-timeout 120 --restart always dockurr/windows` |
+| `2019` | Windows Server 2019 | `curl -fsSL https://get.docker.com \| sh && git clone --depth 1 https://github.com/Kurniaharun/docker-windows.git /root/docker-windows && cd /root/docker-windows && docker run -d --name windows --device=/dev/kvm --device=/dev/net/tun --cap-add NET_ADMIN -p 8006:8006 -p 3389:3389/tcp -p 3389:3389/udp -v /root/docker-windows/windows:/storage -v /root/docker-windows/oem:/oem -e VERSION=2019 -e RAM_SIZE=4G -e CPU_CORES=2 -e DISK_SIZE=64G --stop-timeout 120 --restart always dockurr/windows` |
+| `2016` | Windows Server 2016 | `curl -fsSL https://get.docker.com \| sh && git clone --depth 1 https://github.com/Kurniaharun/docker-windows.git /root/docker-windows && cd /root/docker-windows && docker run -d --name windows --device=/dev/kvm --device=/dev/net/tun --cap-add NET_ADMIN -p 8006:8006 -p 3389:3389/tcp -p 3389:3389/udp -v /root/docker-windows/windows:/storage -v /root/docker-windows/oem:/oem -e VERSION=2016 -e RAM_SIZE=4G -e CPU_CORES=2 -e DISK_SIZE=64G --stop-timeout 120 --restart always dockurr/windows` |
+| `2012` | Windows Server 2012 R2 | `curl -fsSL https://get.docker.com \| sh && git clone --depth 1 https://github.com/Kurniaharun/docker-windows.git /root/docker-windows && cd /root/docker-windows && docker run -d --name windows --device=/dev/kvm --device=/dev/net/tun --cap-add NET_ADMIN -p 8006:8006 -p 3389:3389/tcp -p 3389:3389/udp -v /root/docker-windows/windows:/storage -v /root/docker-windows/oem:/oem -e VERSION=2012 -e RAM_SIZE=4G -e CPU_CORES=2 -e DISK_SIZE=64G --stop-timeout 120 --restart always dockurr/windows` |
+| `2008` | Windows Server 2008 R2 | `curl -fsSL https://get.docker.com \| sh && git clone --depth 1 https://github.com/Kurniaharun/docker-windows.git /root/docker-windows && cd /root/docker-windows && docker run -d --name windows --device=/dev/kvm --device=/dev/net/tun --cap-add NET_ADMIN -p 8006:8006 -p 3389:3389/tcp -p 3389:3389/udp -v /root/docker-windows/windows:/storage -v /root/docker-windows/oem:/oem -e VERSION=2008 -e RAM_SIZE=4G -e CPU_CORES=2 -e DISK_SIZE=64G --stop-timeout 120 --restart always dockurr/windows` |
+| `2003` | Windows Server 2003 R2 | `curl -fsSL https://get.docker.com \| sh && git clone --depth 1 https://github.com/Kurniaharun/docker-windows.git /root/docker-windows && cd /root/docker-windows && docker run -d --name windows --device=/dev/kvm --device=/dev/net/tun --cap-add NET_ADMIN -p 8006:8006 -p 3389:3389/tcp -p 3389:3389/udp -v /root/docker-windows/windows:/storage -v /root/docker-windows/oem:/oem -e VERSION=2003 -e RAM_SIZE=2G -e CPU_CORES=2 -e DISK_SIZE=32G --stop-timeout 120 --restart always dockurr/windows` |
+| `tiny11` | Tiny 11 | `curl -fsSL https://get.docker.com \| sh && git clone --depth 1 https://github.com/Kurniaharun/docker-windows.git /root/docker-windows && cd /root/docker-windows && docker run -d --name windows --device=/dev/kvm --device=/dev/net/tun --cap-add NET_ADMIN -p 8006:8006 -p 3389:3389/tcp -p 3389:3389/udp -v /root/docker-windows/windows:/storage -v /root/docker-windows/oem:/oem -e VERSION=tiny11 -e RAM_SIZE=4G -e CPU_CORES=2 -e DISK_SIZE=64G --stop-timeout 120 --restart always dockurr/windows` |
+| `tiny10` | Tiny 10 | `curl -fsSL https://get.docker.com \| sh && git clone --depth 1 https://github.com/Kurniaharun/docker-windows.git /root/docker-windows && cd /root/docker-windows && docker run -d --name windows --device=/dev/kvm --device=/dev/net/tun --cap-add NET_ADMIN -p 8006:8006 -p 3389:3389/tcp -p 3389:3389/udp -v /root/docker-windows/windows:/storage -v /root/docker-windows/oem:/oem -e VERSION=tiny10 -e RAM_SIZE=4G -e CPU_CORES=2 -e DISK_SIZE=64G --stop-timeout 120 --restart always dockurr/windows` |
+| `core11` | Core 11 | `curl -fsSL https://get.docker.com \| sh && git clone --depth 1 https://github.com/Kurniaharun/docker-windows.git /root/docker-windows && cd /root/docker-windows && docker run -d --name windows --device=/dev/kvm --device=/dev/net/tun --cap-add NET_ADMIN -p 8006:8006 -p 3389:3389/tcp -p 3389:3389/udp -v /root/docker-windows/windows:/storage -v /root/docker-windows/oem:/oem -e VERSION=core11 -e RAM_SIZE=4G -e CPU_CORES=2 -e DISK_SIZE=64G --stop-timeout 120 --restart always dockurr/windows` |
+| `nano11` | Nano 11 | `curl -fsSL https://get.docker.com \| sh && git clone --depth 1 https://github.com/Kurniaharun/docker-windows.git /root/docker-windows && cd /root/docker-windows && docker run -d --name windows --device=/dev/kvm --device=/dev/net/tun --cap-add NET_ADMIN -p 8006:8006 -p 3389:3389/tcp -p 3389:3389/udp -v /root/docker-windows/windows:/storage -v /root/docker-windows/oem:/oem -e VERSION=nano11 -e RAM_SIZE=4G -e CPU_CORES=2 -e DISK_SIZE=64G --stop-timeout 120 --restart always dockurr/windows` |
+
+---
+
+### Windows Resmi — Fresh Install (ISO lokal / URL custom)
+
+Mount file ISO ke `/boot.iso` — **VERSION diabaikan** saat `/boot.iso` ada.
+
+| Mode | Command |
+|---|---|
+| **File ISO lokal** | `curl -fsSL https://get.docker.com \| sh && git clone --depth 1 https://github.com/Kurniaharun/docker-windows.git /root/docker-windows && cd /root/docker-windows && docker run -d --name windows --device=/dev/kvm --device=/dev/net/tun --cap-add NET_ADMIN -p 8006:8006 -p 3389:3389/tcp -p 3389:3389/udp -v /root/docker-windows/windows:/storage -v /root/docker-windows/oem:/oem -v /root/win.iso:/boot.iso -e RAM_SIZE=4G -e CPU_CORES=2 -e DISK_SIZE=64G --stop-timeout 120 --restart always dockurr/windows` |
+| **URL ISO custom** | `curl -fsSL https://get.docker.com \| sh && git clone --depth 1 https://github.com/Kurniaharun/docker-windows.git /root/docker-windows && cd /root/docker-windows && docker run -d --name windows --device=/dev/kvm --device=/dev/net/tun --cap-add NET_ADMIN -p 8006:8006 -p 3389:3389/tcp -p 3389:3389/udp -v /root/docker-windows/windows:/storage -v /root/docker-windows/oem:/oem -e VERSION="https://example.com/win.iso" -e RAM_SIZE=4G -e CPU_CORES=2 -e DISK_SIZE=64G --stop-timeout 120 --restart always dockurr/windows` |
+
+---
+
+### Restore Golden Manual (sudah punya `windows-golden.tar.gz`)
+
+| Command |
+|---|
+| `curl -fsSL https://get.docker.com \| sh && git clone --depth 1 https://github.com/Kurniaharun/docker-windows.git /root/docker-windows && cd /root/docker-windows && docker build -t dockurr/windows:ghostspectre . && wget -O golden/windows-golden.tar.gz "https://archive.org/download/windows-golden.tar/windows-golden.tar.gz" && chmod +x scripts/*.sh && ./scripts/restore-golden.sh && docker compose -f compose.ghostspectre.yml up -d` |
+
+---
+
 ## Features ✨
 
  - ISO downloader
