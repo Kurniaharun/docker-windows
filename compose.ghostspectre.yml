@@ -5,8 +5,8 @@ services:
     container_name: windows
     environment:
       VERSION: "gs11"
-      USERNAME: "KurrXd"
-      PASSWORD: "admin"
+      # Ghost Spectre = install manual (MANUAL:Y). Set akun saat setup installer:
+      # User: Administrator | Pass: 12345678
       RAM_SIZE: "6G"
       CPU_CORES: "2"
       DISK_SIZE: "32G"
