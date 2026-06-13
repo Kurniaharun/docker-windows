@@ -41,7 +41,11 @@ cd "$INSTALL_DIR"
 chmod +x scripts/*.sh 2>/dev/null || true
 
 echo "[4/7] Build Docker image..."
-docker build -t dockurr/windows:ghostspectre .
+if docker image inspect dockurr/windows:ghostspectre &>/dev/null; then
+  echo "  Image sudah ada, skip build."
+else
+  docker build -t dockurr/windows:ghostspectre .
+fi
 
 golden_is_valid() {
   local out="golden/windows-golden.tar.gz"
