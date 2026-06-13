@@ -91,7 +91,7 @@ step() {
 _rt_last_log=0
 progress_line() {
   local msg="$1"
-  printf '\r%s' "    ${CM}${C1}▸${C0} ${msg}   "
+  printf '\r%b' "    ${CM}${C1}▸${C0} ${msg}   "
   local now
   now=$(date +%s)
   if (( now - _rt_last_log >= 15 )); then
@@ -104,11 +104,12 @@ progress_clear() { printf '\r%100s\r' ''; }
 
 progress_bar() {
   local cur=$1 max=$2 label=$3
+  local w=28 pct filled empty bar=""
   [[ "$max" -lt 1 ]] && max=1
-  local pct=$(( cur * 100 / max ))
+  pct=$(( cur * 100 / max ))
   (( pct > 100 )) && pct=100
-  local w=28 filled=$(( pct * w / 100 )) empty=$(( w - filled ))
-  local bar=""
+  filled=$(( pct * w / 100 ))
+  empty=$(( w - filled ))
   bar=$(printf "%${filled}s" | tr ' ' '█')
   bar+=$(printf "%${empty}s" | tr ' ' '░')
   progress_line "${label} [${bar}] ${pct}%"
@@ -116,6 +117,7 @@ progress_bar() {
 
 # aria2: tampilkan baris progress [#...] saja, format rapi
 stream_aria2() {
+  local done=0
   while IFS= read -r line; do
     [[ -z "$line" ]] && continue
     _to_log "DL | $line"
@@ -123,7 +125,8 @@ stream_aria2() {
       local clean="${line#\[#* }"
       clean="${clean%\]}"
       progress_line "Download  ${clean}"
-    elif [[ "$line" =~ [Cc]omplete|[Oo]K[[:space:]]*\| ]]; then
+    elif (( done == 0 )) && [[ "$line" =~ Download[[:space:]]+[Cc]omplete ]]; then
+      done=1
       progress_clear
       log_ok "Download selesai"
     fi
